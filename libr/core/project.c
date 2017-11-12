@@ -360,6 +360,41 @@ R_API RThread *r_core_project_load_bg(RCore *core, const char *prjName, const ch
 
 /*** ^^^ thready ***/
 
+bool r_core_project_multifile(RCore *core, const char *prjfile) {
+	FILE *fd;
+	char buf[256], *file = NULL;
+	char *prj = projectScriptPath (core, prjfile);
+	if (!prj) {
+		eprintf ("Invalid project name '%s'\n", prjfile);
+		return NULL;
+	}
+	fd = r_sandbox_fopen (prj, "r");
+	if (fd) {
+		for (;;) {
+			fgets (buf, sizeof (buf), fd);
+			if (feof (fd)) {
+				break;
+			}
+			if (!strncmp (buf, "\"e prj.multifile = ", 19)) {
+				buf[strlen (buf) - 2] = 0;
+				return strcmp(buf, "false") != 0;
+				break;
+			}
+		}
+		fclose (fd);
+	} else {
+		eprintf ("Cannot open project info (%s)\n", prj);
+	}
+#if 0
+	if (file) {
+		r_cons_printf ("Project: %s\n", prj);
+		r_cons_printf ("FilePath: %s\n", file);
+	}
+#endif
+	free (prj);
+	return false;
+}
+
 R_API bool r_core_project_open(RCore *core, const char *prjfile, bool thready) {
 	int askuser = 1;
 	int ret, close_current_session = 1;
@@ -375,6 +410,7 @@ R_API bool r_core_project_open(RCore *core, const char *prjfile, bool thready) {
 		return false;
 	}
 	char *filepath = r_core_project_info (core, prj);
+	bool multifile = r_core_project_multifile (core, prj);
 	// eprintf ("OPENING (%s) from %s\n", prj, r_config_get (core->config, "file.path"));
 	/* if it is not an URI */
 	if (!filepath) {
@@ -427,7 +463,7 @@ R_API bool r_core_project_open(RCore *core, const char *prjfile, bool thready) {
 		// open new file
 		// TODO: handle read/read-write mode
 		r_io_desc_init (core->io);
-		if (filepath[0]) {
+		if (filepath[0] && !multifile) {
 			/* Old-style project without embedded on commands to open all files.  */
 			fh = r_core_file_open (core, filepath, 0, 0);
 			if (!fh) {
@@ -438,16 +474,18 @@ R_API bool r_core_project_open(RCore *core, const char *prjfile, bool thready) {
 		}
 	}
 
-	if (filepath[0] && close_current_session && r_config_get_i (core->config, "file.info")) {
-		mapaddr = r_config_get_i (core->config, "file.offset");
-		(void)r_core_bin_load (core, filepath, mapaddr? mapaddr: UT64_MAX);
-	}
 	if (thready) {
 		(void) r_core_project_load_bg (core, prjfile, prj);
 		ret = true;
 	} else {
 		/* load sdb stuff in here */
 		ret = r_core_project_load (core, prjfile, prj);
+	}
+
+	if (filepath[0] && close_current_session && r_config_get_i (core->config, "file.info")) {
+		mapaddr = r_config_get_i (core->config, "file.offset");
+		printf("loading shit\n");
+		(void)r_core_bin_load (core, filepath, mapaddr? mapaddr: UT64_MAX);
 	}
 	if (filepath[0]) {
 		newbin = r_config_get (core->config, "file.path");
@@ -510,6 +548,7 @@ R_API char *r_core_project_info(RCore *core, const char *prjfile) {
 	free (prj);
 	return file;
 }
+
 
 static int fdc;		//this is a ugly, remove it, when we have $fd
 
@@ -642,8 +681,9 @@ static bool projectSaveScript(RCore *core, const char *file, int opts) {
 	}
 	// Set file.path and file.lastpath to empty string to signal
 	// new behaviour to project load routine (see io maps below).
-	r_config_set (core->config, "file.path", "");
-	r_config_set (core->config, "file.lastpath", "");
+	//r_config_set (core->config, "file.path", "");
+	//r_config_set (core->config, "file.lastpath", "");
+	r_config_set_i (core->config, "prj.multifile", true);
 	if (opts & R_CORE_PRJ_EVAL) {
 		r_str_write (fd, "# eval\n");
 		r_config_list (core->config, NULL, true);

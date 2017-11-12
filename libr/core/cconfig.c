@@ -2338,6 +2338,7 @@ R_API int r_core_config_init(RCore *core) {
 	SETPREF ("prj.zip", "false", "Use ZIP format for project files");
 	SETPREF ("prj.gpg", "false", "TODO: Encrypt project with GnuPGv2");
 	SETPREF ("prj.simple", "false", "Use simple project saving style (funcions, comments, options)");
+	SETPREF ("prj.multifile", "true", "Loaded project is a multifile project");
 
 	/* cfg */
 	SETPREF ("cfg.plugins", "true", "Load plugins at startup");
