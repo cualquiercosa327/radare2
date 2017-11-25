@@ -2382,6 +2382,9 @@ R_API int r_core_anal_graph(RCore *core, ut64 addr, int opts) {
 	}
 	hc = r_config_hold_new (core->config);
 	if (!hc) {
+		if (is_json) {
+			r_cons_printf ("[]\n");
+		}
 		return false;
 	}
 	r_config_save_num (hc, "asm.lines", "asm.bytes", "asm.dwarf", NULL);
