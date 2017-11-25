@@ -2380,10 +2380,6 @@ R_API int r_core_anal_graph(RCore *core, ut64 addr, int opts) {
 	if (!addr) {
 		addr = core->offset;
 	}
-	if (r_list_empty (core->anal->fcns)) {
-		eprintf ("No functions to diff\n");
-		return false;
-	}
 	hc = r_config_hold_new (core->config);
 	if (!hc) {
 		return false;
