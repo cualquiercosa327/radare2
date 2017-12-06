@@ -238,12 +238,17 @@ typedef struct {
 	int cmtcount;
 	int shortcut_pos;
 	bool asm_anal;
+
+	bool use_json;
+	bool first_line;
 } RDisasmState;
 
 static void ds_setup_print_pre(RDisasmState *ds, bool tail, bool middle);
 static void ds_setup_pre(RDisasmState *ds, bool tail, bool middle);
 static void ds_print_pre(RDisasmState *ds);
 static void ds_beginline(RDisasmState *ds, RAnalFunction *f, bool nopre);
+static void ds_begin_json_line(RDisasmState *ds);
+static void ds_newline(RDisasmState *ds);
 static void ds_print_esil_anal(RDisasmState *ds);
 static void ds_reflines_init(RDisasmState *ds);
 static void ds_align_comment(RDisasmState *ds);
@@ -431,7 +436,7 @@ static void ds_comment_esil(RDisasmState *ds, bool up, bool end, const char *for
 
 	if (ds->show_comments && !ds->show_comment_right) {
 		if (end) {
-			r_cons_newline ();
+			ds_newline (ds);
 		}
 	}
 }
@@ -964,6 +969,25 @@ static void ds_beginline(RDisasmState *ds, RAnalFunction *f, bool nopre) {
 	ds->line = tmp;
 }
 
+static void ds_begin_json_line(RDisasmState *ds) {
+	if (!ds->use_json) {
+		return;
+	}
+	if (!ds->first_line) {
+		r_cons_print (",");
+	}
+	ds->first_line = false;
+	r_cons_printf ("{offset:%"PFMT64d",text:\"", ds->vat);
+}
+
+static void ds_newline(RDisasmState *ds) {
+	if (ds->use_json) {
+		r_cons_printf ("\"}");
+	} else {
+		r_cons_newline ();
+	}
+}
+
 static void ds_pre_xrefs(RDisasmState *ds) {
 	RCore *core = ds->core;
 	if (ds->show_fcnlines) {
@@ -1057,7 +1081,7 @@ static void ds_show_xrefs(RDisasmState *ds) {
 			if (count == cols) {
 				if (iter->n) {
 					ds_print_color_reset (ds);
-					r_cons_newline ();
+					ds_newline (ds);
 					ds_pre_xrefs (ds);
 					ds_comment (ds, false, "   %s; XREFS: ", ds->show_color? ds->pal_comment: "");
 				}
@@ -1067,7 +1091,7 @@ static void ds_show_xrefs(RDisasmState *ds) {
 			}
 		}
 		ds_print_color_reset (ds);
-		r_cons_newline ();
+		ds_newline (ds);
 		r_list_free (xrefs);
 		return;
 	}
@@ -1562,6 +1586,7 @@ static void ds_show_comments_right(RDisasmState *ds) {
 		}
 	}
 	if (!ds->show_comment_right) {
+		ds_begin_json_line (ds);
 		int mycols = ds->lcols;
 		if ((mycols + linelen + 10) > core->cons->columns) {
 			mycols = 0;
@@ -1592,16 +1617,18 @@ static void ds_show_comments_right(RDisasmState *ds) {
 			ds_print_color_reset (ds);
 		}
 		R_FREE (ds->comment);
-		r_cons_newline ();
+		ds_newline (ds);
 		/* flag one */
 		if (item && item->comment && ds->ocomment != item->comment) {
+			ds_begin_json_line (ds);
 			if (ds->show_color) {
 				r_cons_strcat (ds->pal_comment);
 			}
-			r_cons_newline ();
+			ds_newline (ds);
+			ds_begin_json_line (ds);
 			r_cons_strcat ("  ;  ");
 			r_cons_strcat_justify (item->comment, mycols, ';');
-			r_cons_newline ();
+			ds_newline (ds);
 			if (ds->show_color) {
 				ds_print_color_reset (ds);
 			}
@@ -1624,6 +1651,7 @@ static void ds_show_flags(RDisasmState *ds) {
 	f = fcnIn (ds, ds->at, R_ANAL_FCN_TYPE_NULL);
 	flaglist = r_flag_get_list (core->flags, ds->at);
 	r_list_foreach (flaglist, iter, flag) {
+		ds_begin_json_line (ds);
 		if (f && f->addr == flag->offset && !strcmp (flag->name, f->name)) {
 			// do not show flags that have the same name as the function
 			continue;
@@ -1670,7 +1698,7 @@ static void ds_show_flags(RDisasmState *ds) {
 		if (ds->show_color) {
 			r_cons_strcat (Color_RESET);
 		}
-		r_cons_newline ();
+		ds_newline (ds);
 	}
 }
 
@@ -3181,7 +3209,7 @@ static void ds_print_ptr(RDisasmState *ds, int len, int idx) {
 	}
 #if 0
 	if (!ds->show_comment_right && ds->cmtcount > 0) {
-		r_cons_newline ();
+		ds_newline (ds);
 	}
 #endif
 #if DEADCODE
@@ -3315,7 +3343,7 @@ static int myregwrite(RAnalEsil *esil, const char *name, ut64 *val) {
 			if (msg && *msg) {
 				ds_comment_esil (ds, true, false, "; %s", msg);
 				if (ds->show_comments && !ds->show_comment_right) {
-					r_cons_newline ();
+					ds_newline (ds);
 				}
 			}
 		} else {
@@ -3325,7 +3353,7 @@ static int myregwrite(RAnalEsil *esil, const char *name, ut64 *val) {
 				ds_comment_esil (ds, true, false, "; %s=0x%"PFMT64x, name, *val);
 			}
 			if (ds->show_comments && !ds->show_comment_right) {
-				r_cons_newline ();
+				ds_newline (ds);
 			}
 		}
 	}
@@ -3780,7 +3808,7 @@ static void ds_print_comments_right(RDisasmState *ds) {
 					r_cons_strcat (ds->color_usrcmt);
 				}
 				if (strchr (comment, '\n')) {
-					r_cons_newline ();
+					ds_newline (ds);
 					char *align = r_str_newf ("%s  ;^ ", ds->pre);
 					char *c = r_str_prefix_all (strdup (comment), align);
 					r_cons_strcat (c);
@@ -3829,6 +3857,8 @@ R_API int r_core_print_disasm(RPrint *p, RCore *core, ut64 addr, ut8 *buf, int l
 	ds->len = len;
 	ds->addr = addr;
 	ds->hint = NULL;
+	ds->use_json = true; // TODO: from parameter or config
+	ds->first_line = true;
 	//r_cons_printf ("len =%d l=%d ib=%d limit=%d\n", len, l, invbreak, p->limit);
 	// TODO: import values from debugger is possible
 	// TODO: allow to get those register snapshots from traces
@@ -3875,6 +3905,10 @@ toro:
 		if (item) {
 			ds->dest = item->offset;
 		}
+	}
+
+	if (ds->use_json) {
+		r_cons_print ("[");
 	}
 
 	ds_print_esil_anal_init (ds);
@@ -4021,6 +4055,9 @@ toro:
 				ds_print_esil_anal (ds);
 			}
 		}
+
+		ds_begin_json_line (ds); // TODO: correct position or rather before the if above?
+
 		ds_setup_print_pre (ds, false, false);
 		ds_print_lines_left (ds);
 		// f = r_anal_get_fcn_in (core->anal, ds->addr, 0);
@@ -4082,7 +4119,7 @@ toro:
 			ds->mi_found = false;
 		}
 
-		r_cons_newline ();
+		ds_newline (ds);
 		if (ds->show_bbline && !ds->bblined && !ds->fcn) {
 			switch (ds->analop.type) {
 			case R_ANAL_OP_TYPE_MJMP:
@@ -4120,6 +4157,11 @@ toro:
 		}
 		inc += ds->asmop.payload + (ds->asmop.payload % ds->core->assembler->dataalign);
 	}
+
+	if (ds->use_json) {
+		r_cons_print ("]");
+	}
+
 	R_FREE (nbuf);
 	r_cons_break_pop ();
 
@@ -4927,7 +4969,7 @@ R_API int r_core_print_fcn_disasm(RPrint *p, RCore *core, ut64 addr, int l, int 
 			ds_show_refs (ds);
 			ds_print_esil_anal (ds);
 			if (!(ds->show_comments && ds->show_comment_right && ds->comment)) {
-				r_cons_newline ();
+				ds_newline (ds);
 			}
 			if (ds->line) {
 				R_FREE (ds->line);
