@@ -1,3 +1,7 @@
+
+#include "r_util.h"
+#include "r_core.h"
+
 #define VTABLE_BUFF_SIZE 10
 
 typedef struct vtable_info_t {
@@ -45,28 +49,31 @@ static int valueInTextSection(RCore *core, ut64 curAddress) {
 }
 
 static int isVtableStart(RCore *core, ut64 curAddress) {
-	RAsmOp asmop = R_EMPTY;
-	RAnalRef *xref;
-	RListIter *xrefIter;
 	ut8 buf[VTABLE_BUFF_SIZE];
 	if (!curAddress || curAddress == UT64_MAX) {
 		return false;
 	}
-	if (valueInTextSection (core, curAddress)) {
-		// total xref's to curAddress
-		RList *xrefs = r_anal_xrefs_get (core->anal, curAddress);
-		if (!r_list_empty (xrefs)) {
-			r_list_foreach (xrefs, xrefIter, xref) {
-				// section in which currenct xref lies
-				if (inTextSection (core, xref->addr)) {
-					r_io_read_at (core->io, xref->addr, buf, VTABLE_BUFF_SIZE);
-					if (r_asm_disassemble (core->assembler, &asmop, buf, VTABLE_BUFF_SIZE) > 0) {
-						if ((!strncmp (asmop.buf_asm, "mov", 3)) ||
-						    (!strncmp (asmop.buf_asm, "lea", 3))) {
-							return true;
-						}
-					}
-				}
+	if (!valueInTextSection (core, curAddress)) {
+		return false;
+	}
+	// total xref's to curAddress
+	RList *xrefs = r_anal_xrefs_get (core->anal, curAddress);
+	if (r_list_empty (xrefs)) {
+		return false;
+	}
+	RAnalRef *xref;
+	RListIter *xrefIter;
+	r_list_foreach (xrefs, xrefIter, xref) {
+		// section in which currenct xref lies
+		if (!inTextSection (core, xref->addr)) {
+			continue;
+		}
+		r_io_read_at (core->io, xref->addr, buf, VTABLE_BUFF_SIZE);
+		RAsmOp asmop = R_EMPTY;
+		if (r_asm_disassemble (core->assembler, &asmop, buf, VTABLE_BUFF_SIZE) > 0) {
+			if ((!strncmp (asmop.buf_asm, "mov", 3)) ||
+				(!strncmp (asmop.buf_asm, "lea", 3))) {
+				return true;
 			}
 		}
 	}
@@ -93,8 +100,8 @@ RList* search_virtual_tables(RCore *core){
 	ut64 bits = r_config_get_i (core->config, "asm.bits");
 	int wordSize = bits / 8;
 	r_list_foreach (sections, iter, section) {
-		if (!strcmp (section->name, ".rodata")) {
-			ut8 *segBuff = calloc (1, section->size);
+		if (!strcmp (section->name, ".rodata") || !strcmp (section->name, ".rdata")) {
+			ut8 *segBuff = calloc (1, section->vsize);
 			r_io_read_at (core->io, section->vaddr, segBuff, section->vsize);
 			startAddress = section->vaddr;
 			endAddress = startAddress + (section->vsize) - (bits/8);
