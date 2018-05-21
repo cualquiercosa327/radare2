@@ -2,8 +2,8 @@
 
 #include "r_anal.h"
 
-R_API void r_anal_rtti_print_at_vtable(RAnal *anal, ut64 addr, int mode) {
-	bool use_json = mode == 'j';
+R_API void r_anal_rtti_print_at_vtable(RAnal *anal, ut64 addr, int flags) {
+	bool use_json = (flags & R_ANAL_RTTI_PRINT_FLAG_JSON) != 0;
 	if (use_json) {
 		r_cons_print ("[");
 	}
@@ -11,9 +11,9 @@ R_API void r_anal_rtti_print_at_vtable(RAnal *anal, ut64 addr, int mode) {
 	RVTableContext context;
 	r_anal_vtable_begin (anal, &context);
 	if (context.abi == R_ANAL_CPP_ABI_MSVC) {
-		r_anal_rtti_msvc_print_at_vtable (&context, addr, mode);
+		r_anal_rtti_msvc_print_at_vtable (&context, addr, flags);
 	} else {
-		r_anal_rtti_itanium_print_at_vtable (&context, addr, mode);
+		r_anal_rtti_itanium_print_at_vtable (&context, addr, flags);
 	}
 
 	if (use_json) {
@@ -21,8 +21,8 @@ R_API void r_anal_rtti_print_at_vtable(RAnal *anal, ut64 addr, int mode) {
 	}
 }
 
-static void rtti_msvc_print_all(RVTableContext *context, int mode) {
-	bool use_json = mode == 'j';
+static void rtti_msvc_print_all(RVTableContext *context, int flags) {
+	bool use_json = (flags & R_ANAL_RTTI_PRINT_FLAG_JSON) != 0;
 	bool json_first = true;
 	if (use_json) {
 		r_cons_print ("[");
@@ -46,7 +46,7 @@ static void rtti_msvc_print_all(RVTableContext *context, int mode) {
 					r_cons_print (",");
 				}
 			}
-			r_anal_rtti_msvc_print_at_vtable (context, table->saddr, mode);
+			r_anal_rtti_msvc_print_at_vtable (context, table->saddr, flags);
 			if (!use_json) {
 				r_cons_print ("\n");
 			}
@@ -61,8 +61,8 @@ static void rtti_msvc_print_all(RVTableContext *context, int mode) {
 	r_cons_break_pop ();
 }
 
-static void rtti_itanium_print_all(RVTableContext *context, int mode) {
-	bool use_json = mode == 'j';
+static void rtti_itanium_print_all(RVTableContext *context, int flags) {
+	bool use_json = (flags & R_ANAL_RTTI_PRINT_FLAG_JSON) != 0;
 	bool json_first = true;
 	if (use_json) {
 		r_cons_print ("[");
@@ -86,7 +86,7 @@ static void rtti_itanium_print_all(RVTableContext *context, int mode) {
 					r_cons_print (",");
 				}
 			}
-			r_anal_rtti_itanium_print_at_vtable (context, table->saddr, mode);
+			r_anal_rtti_itanium_print_at_vtable (context, table->saddr, flags);
 			if (!use_json) {
 				r_cons_print ("\n");
 			}
@@ -101,12 +101,12 @@ static void rtti_itanium_print_all(RVTableContext *context, int mode) {
 	r_cons_break_pop ();
 }
 
-R_API void r_anal_rtti_print_all(RAnal *anal, int mode) {
+R_API void r_anal_rtti_print_all(RAnal *anal, int flags) {
 	RVTableContext context;
 	r_anal_vtable_begin (anal, &context);
 	if (context.abi == R_ANAL_CPP_ABI_MSVC) {
-		rtti_msvc_print_all (&context, mode);
+		rtti_msvc_print_all (&context, flags);
 	} else {
-		rtti_itanium_print_all (&context, mode);
+		rtti_itanium_print_all (&context, flags);
 	}
 }

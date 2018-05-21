@@ -6777,10 +6777,12 @@ static void cmd_anal_rtti(RCore *core, const char *input) {
 	switch (input[0]) {
 	case '\0': // "avr"
 	case 'j': // "avrj"
-		r_anal_rtti_print_at_vtable (core->anal, core->offset, input[0]);
+		r_anal_rtti_print_at_vtable (core->anal, core->offset,
+			R_ANAL_RTTI_PRINT_FLAG_JSON | R_ANAL_RTTI_PRINT_FLAG_ERRORS);
 		break;
 	case 'a': // "avra"
-		r_anal_rtti_print_all (core->anal, input[1]);
+		r_anal_rtti_print_all (core->anal,
+			(input[1] == 'j' ? R_ANAL_RTTI_PRINT_FLAG_JSON : 0));
 		break;
 	default :
 		r_core_cmd_help (core, help_msg_av);
