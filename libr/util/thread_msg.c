@@ -5,7 +5,11 @@
 R_API RThreadMsg* r_th_msg_new (const char *cmd, void *cb) {
 	RThreadMsg *msg = R_NEW0 (RThreadMsg);
 	if (msg) {
-		msg->text = strdup (cmd);
+		if (cmd) {
+			msg->text = strdup (cmd);
+		} else {
+			msg->text = NULL;
+		}
 		//msg->cb = cb;
 		msg->done = 0;
 	}

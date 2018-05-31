@@ -158,8 +158,15 @@ static int task_run(RCoreTask *task) {
 	task_begin (task);
 
 	// close (2); // no stderr
-	char *res = r_core_cmd_str (core, task->msg->text);
+	char *res;
+	if (task == task->core->main_task) {
+		r_core_cmd0(core, task->msg->text);
+		res = NULL;
+	} else {
+		res = r_core_cmd_str (core, task->msg->text);
+	}
 	task->msg->res = res;
+
 	eprintf ("\nTask %d finished\n", task->id);
 
 	task_end (task);
@@ -181,9 +188,13 @@ R_API void r_core_task_enqueue(RCore *core, RCoreTask *task) {
 R_API void r_core_task_run_sync(RCore *core, RCoreTask *task) {
 	r_th_lock_enter (core->tasks_lock);
 	r_list_append (core->tasks, task);
-	r_th_lock_enter (core->tasks_lock);
+	r_th_lock_leave (core->tasks_lock);
 
 	task_run (task);
+
+	r_th_lock_enter (core->tasks_lock);
+	r_list_delete_data (core->tasks, task);
+	r_th_lock_leave (core->tasks_lock);
 }
 
 R_API const char *r_core_task_status (RCoreTask *task) {
