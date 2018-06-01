@@ -193,7 +193,7 @@ R_API void r_core_task_run_sync(RCore *core, RCoreTask *task) {
 	task_run (task);
 
 	r_th_lock_enter (core->tasks_lock);
-	r_list_delete_data (core->tasks, task);
+	r_list_remove_data (core->tasks, task);
 	r_th_lock_leave (core->tasks_lock);
 }
 
