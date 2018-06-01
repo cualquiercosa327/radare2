@@ -1244,6 +1244,7 @@ static int cmd_pipein(void *user, const char *input) {
 
 static void task_test(RCore *core, int usecs) {
 	int i;
+	eprintf("getting task\n");
 	RCoreTask *task = r_core_task_self (core);
 	r_cons_break_push (NULL, NULL);
 	for (i=0; i<10; i++) {

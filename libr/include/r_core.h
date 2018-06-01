@@ -201,6 +201,7 @@ typedef struct r_core_t {
 	bool in_search;
 	RList *watchers;
 	RList *scriptstack;
+	int task_id_next;
 	RList *tasks;
 	RList *tasks_queue;
 	RCoreTask *main_task;
