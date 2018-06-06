@@ -63,6 +63,7 @@ R_API RCoreTask *r_core_task_new (RCore *core, const char *cmd, RCoreTaskCallbac
 	}
 
 	task->msg = r_th_msg_new (cmd, r_core_task_thread);
+	task->cmd_log = false;
 	task->dispatch_cond = r_th_cond_new ();
 	task->dispatch_lock = r_th_lock_new (false);
 	if (!task->msg || !task->dispatch_cond || !task->dispatch_cond) {
@@ -163,19 +164,21 @@ static int task_run(RCoreTask *task) {
 	task_begin (task);
 
 	// close (2); // no stderr
-	char *res;
+	char *res_str;
+	int res;
 	if (task == task->core->main_task) {
-		r_core_cmd0 (core, task->msg->text);
-		res = NULL;
+		res = r_core_cmd (core, task->msg->text, task->cmd_log);
+		res_str = NULL;
 	} else {
-		res = r_core_cmd_str (core, task->msg->text);
+		res = 0;
+		res_str = r_core_cmd_str (core, task->msg->text);
 	}
-	task->msg->res = res;
+	task->msg->res = res_str;
 
 	//eprintf ("\nTask %d finished\n", task->id);
 
 	task_end (task);
-	return 0;
+	return res;
 }
 
 static int task_run_thread(RThread *th) {
@@ -191,17 +194,19 @@ R_API void r_core_task_enqueue(RCore *core, RCoreTask *task) {
 	r_th_lock_leave (core->tasks_lock);
 }
 
-R_API void r_core_task_run_sync(RCore *core, RCoreTask *task) {
+R_API int r_core_task_run_sync(RCore *core, RCoreTask *task) {
 	r_th_lock_enter (core->tasks_lock);
 	r_list_append (core->tasks, task);
 	r_th_lock_leave (core->tasks_lock);
 
 	task->msg->th = NULL;
-	task_run (task);
+	int res = task_run (task);
 
 	r_th_lock_enter (core->tasks_lock);
 	r_list_remove_data (core->tasks, task);
 	r_th_lock_leave (core->tasks_lock);
+
+	return res;
 }
 
 R_API const char *r_core_task_status (RCoreTask *task) {
@@ -229,26 +234,6 @@ R_API RCoreTask *r_core_task_self (RCore *core) {
 		}
 	}
 	return core->main_task;
-}
-
-R_API bool r_core_task_pause (RCore *core, RCoreTask *task, bool enable) {
-	if (!core) {
-		return false;
-	}
-	if (task) {
-		if (task->state != 'd' && task->msg) {
-			r_th_pause (task->msg->th, enable);
-		}
-	} else {
-		RListIter *iter;
-		r_list_foreach (core->tasks, iter, task) {
-			// XXX: this lock pauses the whole r2
-			if (task) {
-				r_core_task_pause (core, task, enable);
-			}
-		}
-	}
-	return true;
 }
 
 R_API int r_core_task_cat (RCore *core, int id) {
