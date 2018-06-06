@@ -30,7 +30,8 @@ R_API void r_th_cond_signal_all(RThreadCond *cond) {
 
 R_API void r_th_cond_wait(RThreadCond *cond, RThreadLock *lock) {
 #if HAVE_PTHREAD
-	pthread_cond_wait(&cond->cond, &lock->lock);
+	int r = pthread_cond_wait(&cond->cond, &lock->lock);
+	eprintf("pthread_cond_wait returned %d\n", r);
 #endif
 }
 

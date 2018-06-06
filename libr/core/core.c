@@ -1745,6 +1745,7 @@ R_API bool r_core_init(RCore *core) {
 	core->blocksize_max = R_CORE_BLOCKSIZE_MAX;
 	core->task_id_next = 0;
 	core->tasks = r_list_newf (free);
+	core->tasks_queue = r_list_new ();
 	core->tasks_lock = r_th_lock_new (false);
 	core->main_task = r_core_task_new (core, NULL, NULL, NULL);
 	core->watchers = r_list_new ();
@@ -1943,6 +1944,7 @@ R_API RCore *r_core_fini(RCore *c) {
 	r_list_free (c->watchers);
 	r_list_free (c->scriptstack);
 	r_list_free (c->tasks);
+	r_list_free (c->tasks_queue);
 	r_th_lock_free (c->tasks_lock);
 	// TODO r_core_task_free (c->main_task);
 	c->rcmd = r_cmd_free (c->rcmd);
@@ -2136,10 +2138,7 @@ R_API int r_core_prompt(RCore *r, int sync) {
 }
 
 R_API int r_core_prompt_exec(RCore *r) {
-	RCoreTask *task = r->main_task;
-	task->msg->text = r->cmdqueue;
-	task->state = R_CORE_TASK_STATE_BEFORE_START;
-	r_core_task_run_sync (r, task);
+	r_core_cmd_task_sync (r, r->cmdqueue);
 	//int ret = r_core_cmd (r, r->cmdqueue, true);
 	if (r->cons && r->cons->use_tts) {
 		const char *buf = r_cons_get_buffer();

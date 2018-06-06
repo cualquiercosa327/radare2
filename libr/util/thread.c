@@ -44,7 +44,7 @@ R_API int r_th_push_task(struct r_th_t *th, void *user) {
 }
 
 R_API R_TH_TID r_th_self(void) {
-#if HAVE_PTRACE || __APPLE__
+#if HAVE_PTHREAD
 	return pthread_self ();
 #elif __WINDOWS__
 	return (HANDLE)GetCurrentThreadId ();
@@ -59,7 +59,7 @@ R_API RThread *r_th_new(R_TH_FUNCTION(fun), void *user, int delay) {
 	if (th) {
 		th->lock = r_th_lock_new (false);
 		th->running = false;
-		th->fun = fun;	
+		th->fun = fun;
 		th->user = user;
 		th->delay = delay;
 		th->breaked = false;

@@ -88,19 +88,21 @@ static void schedule_tasks(RCoreTask *current, bool end) {
 	r_th_lock_enter (current->core->tasks_lock);
 
 	if (end) {
+		eprintf("rip task %d\n", current->id);
 		current->state = R_CORE_TASK_STATE_DONE;
 		r_th_lock_leave (current->dispatch_lock);
 	}
 
 	RCoreTask *next = r_list_pop_head (current->core->tasks_queue);
 
-	if (next) {
+	if (next && !end) {
 		r_list_append (current->core->tasks_queue, current);
 	}
 
 	r_th_lock_leave (current->core->tasks_lock);
 
 	if (next) {
+		eprintf("task %d passes the baton to %d\n", current->id, next->id);
 		r_th_lock_enter (next->dispatch_lock);
 		r_th_cond_signal (next->dispatch_cond);
 		r_th_lock_leave (next->dispatch_lock);
