@@ -1254,17 +1254,17 @@ static int cmd_pipein(void *user, const char *input) {
 	return 0;
 }
 
-static void task_test(RCore *core, int usecs) {
+static void task_test(RCore *core, int usecs, int steps) {
 	int i;
 	RCoreTask *task = r_core_task_self (core);
 	r_cons_break_push (NULL, NULL);
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < steps; i++) {
 		if (r_cons_is_breaked()) {
 			r_cons_printf ("task %d was breaked!\n", task->id);
 			break;
 		}
-		r_cons_printf ("task %d doing work %d/%d\n", task->id, i, 10);
-		eprintf ("task %d doing work %d/%d\n", task->id, i, 10);
+		r_cons_printf ("task %d doing work %d/%d\n", task->id, i, steps);
+		eprintf ("task %d doing work %d/%d\n", task->id, i, steps);
 		if (usecs > 0) {
 			r_sys_usleep (usecs);
 		}
@@ -1282,10 +1282,20 @@ static int cmd_thread(void *data, const char *input) {
 		break;
 	case 't': { // "&t"
 		int usecs = 0;
+		int steps = 10;
 		if (input[1] == ' ') {
-			usecs = (int) r_num_math (core->num, input + 1);
+			input++;
+			while (input[0] == ' ') {
+				input++;
+			}
+			char *steps_arg = strchr (input, ' ');
+			if (steps_arg) {
+				*steps_arg = '\0';
+				steps = (int) r_num_math (core->num, steps_arg + 1);
+			}
+			usecs = (int) r_num_math (core->num, input);
 		}
-		task_test (core, usecs);
+		task_test (core, usecs, steps);
 		break;
 	}
 	case '&': { // "&&"
